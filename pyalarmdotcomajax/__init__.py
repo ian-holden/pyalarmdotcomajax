@@ -6,7 +6,9 @@ import contextlib
 import json
 import logging
 import re
-from datetime import datetime
+# !IGH! MOD START {
+from datetime import datetime, timedelta, timezone
+# !IGH! MOD END }
 from enum import Enum
 
 import aiohttp
@@ -93,6 +95,18 @@ class AlarmController:
     AJAX_HEADERS_TEMPLATE = {
         "Accept": "application/vnd.api+json",
         "ajaxrequestuniquekey": None,
+
+	    # !IGH! MOD START {
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "same-origin",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
+        "User-Agent": 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36',
+        "sec-ch-ua": '"Chromium";v="110", "Not A(Brand";v="24", "Google Chrome";v="110"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "Linux",
+	    # !IGH! MOD END }
     }
 
     # LOGIN & SESSION: BEGIN
@@ -169,6 +183,10 @@ class AlarmController:
         self.thermostats: list[Thermostat] = []
         self.water_sensors: list[WaterSensor] = []
 
+	    # !IGH! MOD START {
+        self.activities: dict = {}
+        self.status = 'alive'
+	    # !IGH! MOD END }
     #
     #
     ##############
@@ -238,6 +256,15 @@ class AlarmController:
         except NagScreen:
             return AuthResult.ENABLE_TWO_FACTOR
 
+	    # !IGH! MOD START {
+        # DBG log cookies
+        print("DBG cookies:")
+        for cookie in self._websession.cookie_jar:
+            print("DBG '{}': '{}'".format(cookie.key, cookie.value))
+
+        self.status = 'alive'
+	    # !IGH! MOD END }
+		
         return AuthResult.SUCCESS
 
     async def async_request_otp(self) -> str | None:
@@ -607,6 +634,41 @@ class AlarmController:
         elif device_class is WaterSensor:
             self.water_sensors[:] = devices
 
+    # !IGH! MOD START {
+    async def async_activity(self, from_hours_ago=1) -> None:
+        """Fetch latest device data."""
+
+        log.debug("Calling activity on Alarm.com")
+
+        await self._async_get_activities_last_hours(from_hours_ago)
+
+    async def old_keep_alive(self) -> str:
+        """Ping server to keep alive. returns 'alive', 'resurected', 'dead'"""
+
+        log.debug("Calling KeepAlive on Alarm.com")
+
+        status = 'alive' 
+        if not self._keep_alive():
+            status = 'resurected'
+
+            await self.async_login()  # attempt a login again
+            if not self._keep_alive():
+                status = 'dead'
+        self.status = status
+
+    async def keep_alive(self) -> None:
+        """Check if we are logged in."""
+
+        async with self._websession.get(
+            url=self.KEEP_ALIVE_CHECK_URL_TEMPLATE.format(c.URL_BASE, int(round(datetime.now().timestamp()))),
+            headers=self._ajax_headers,
+        ) as resp:
+            text_rsp = await resp.text()
+
+        if bool(text_rsp != self.KEEP_ALIVE_CHECK_RESPONSE):
+            self.status = 'dead'
+    # !IGH! MOD END }
+
     async def async_send_command(
         self,
         device_type: DeviceType,
@@ -972,6 +1034,53 @@ class AlarmController:
             self._trouble_conditions = {}
             log.error("Failed processing trouble conditions.")
             raise UnexpectedDataStructure from err
+
+    # !IGH! MOD START {
+    async def _async_get_activities_last_hours(self, from_hours_ago=1 ) -> None:
+        """Get trouble conditions for all devices."""
+        # get a UTC (Z style) ISO timestamp for the number of hours ago requested
+        starttime = (datetime.now(timezone.utc) - timedelta(hours=from_hours_ago)).isoformat().replace("+00:00", "Z")
+        try:
+            async with self._websession.get(
+                url=c.ACTIVITY_URL_TEMPLATE.format(c.URL_BASE, 100, starttime),
+                headers=self._ajax_headers,
+            ) as resp:
+                json_rsp = await resp.json()
+
+                log.debug("Activities response:\n%s", json_rsp)
+                # print("Activities response:\n%s", json_rsp)
+
+                activities = []
+                for event in json_rsp.get("included", []):
+                    if event['type'] == 'activity/history-event':
+                        attrs = event['attributes']
+                        activities.append({
+                            'date': attrs['eventDate'],
+                            'description': attrs['description'],
+                            'deviceDescription': attrs['deviceDescription']
+                            })
+
+                self.activities = activities
+
+        except aiohttp.ContentTypeError as err:
+            log.error(
+                (
+                    "Server returned wrong content type. Response: %s\n\nResponse"
+                    " Text:\n\n%s\n\n"
+                ),
+                resp,
+                resp.text(),
+            )
+            raise DataFetchFailed from err
+
+        except (asyncio.TimeoutError, aiohttp.ClientError) as err:
+            log.error("Connection error while fetching activities.")
+            raise DataFetchFailed from err
+
+        except KeyError as err:
+            log.error("Failed processing activities.")
+            raise UnexpectedDataStructure from err
+    # !IGH! MOD END }
 
     async def _async_build_device_list(
         self,

@@ -155,3 +155,8 @@ dmypy.json
 
 # MonkeyType
 monkeytype.sqlite3
+
+# IGH rjh gatherer/monitor code repo
+rjh-monitor/
+pyalarmdotcomajax.sublime-*
+

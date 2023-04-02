@@ -18,6 +18,16 @@
   <a href="https://github.com/pyalarmdotcom/pyalarmdotcomajax/blob/master/LICENSE"><img alt="GitHub" src="https://img.shields.io/github/license/pyalarmdotcom/pyalarmdotcomajax"></a>
 </p>
 
+## IGH Additions
+
+Added some support for Activities
+
+Added persistent cookie support to avoid email warnings about new device login
+
+Folder rjh-monitor (ignored, and in it's own repo) contains the code that uses these mods.
+It gathers activity data into an sqlite database and produces an html page showing
+a graph of activity over 24 hrs that is refreshed every 5 mins
+
 ## Installation / Usage
 
 To install use pip:
