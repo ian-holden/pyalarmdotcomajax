@@ -95,18 +95,6 @@ class AlarmController:
     AJAX_HEADERS_TEMPLATE = {
         "Accept": "application/vnd.api+json",
         "ajaxrequestuniquekey": None,
-
-	    # !IGH! MOD START {
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "same-origin",
-        "Sec-Fetch-User": "?1",
-        "Upgrade-Insecure-Requests": "1",
-        "User-Agent": 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36',
-        "sec-ch-ua": '"Chromium";v="110", "Not A(Brand";v="24", "Google Chrome";v="110"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": "Linux",
-	    # !IGH! MOD END }
     }
 
     # LOGIN & SESSION: BEGIN
@@ -183,10 +171,10 @@ class AlarmController:
         self.thermostats: list[Thermostat] = []
         self.water_sensors: list[WaterSensor] = []
 
-	    # !IGH! MOD START {
+        # !IGH! MOD START {
         self.activities: dict = {}
         self.status = 'alive'
-	    # !IGH! MOD END }
+        # !IGH! MOD END }
     #
     #
     ##############
@@ -256,16 +244,26 @@ class AlarmController:
         except NagScreen:
             return AuthResult.ENABLE_TWO_FACTOR
 
-	    # !IGH! MOD START {
-        # DBG log cookies
-        print("DBG cookies:")
-        for cookie in self._websession.cookie_jar:
-            print("DBG '{}': '{}'".format(cookie.key, cookie.value))
+        # # !IGH! MOD START {
+        # # DBG log cookies
+        # print("DBG cookies:")
+        # for cookie in self._websession.cookie_jar:
+        #     print("DBG '{}': '{}'".format(cookie.key, cookie.value))
 
-        self.status = 'alive'
-	    # !IGH! MOD END }
-		
+        # self.status = 'alive'
+        # # !IGH! MOD END }
+        
         return AuthResult.SUCCESS
+
+    # # !IGH! MOD START {
+    # # DBG log requests
+    # async def on_request_end(self, session, trace_config_ctx, params):
+    #     print('---')
+    #     print("Ending %s request for %s. I sent: %s" % (params.method, params.url, params.headers))
+    #     print('')
+    #     print('Sent headers: %s' % params.response.request_info.headers)
+    #     print('')
+    # # !IGH! MOD END }
 
     async def async_request_otp(self) -> str | None:
         """Request SMS/email OTP code from Alarm.com."""
@@ -1037,7 +1035,7 @@ class AlarmController:
 
     # !IGH! MOD START {
     async def _async_get_activities_last_hours(self, from_hours_ago=1 ) -> None:
-        """Get trouble conditions for all devices."""
+        """Get up to 100 activities from a number of hours ago for all devices."""
         # get a UTC (Z style) ISO timestamp for the number of hours ago requested
         starttime = (datetime.now(timezone.utc) - timedelta(hours=from_hours_ago)).isoformat().replace("+00:00", "Z")
         try:
