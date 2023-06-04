@@ -119,6 +119,7 @@ class AlarmController:
 
     KEEP_ALIVE_CHECK_URL_TEMPLATE = "{}web/KeepAlive.aspx?timestamp={}"
     KEEP_ALIVE_CHECK_RESPONSE = '{"status":"Keep Alive"}'
+    KEEP_ALIVE_CHECK_RESPONSE_1 = '{"status":1}'
     KEEP_ALIVE_URL = "{}web/api/identities/{}/reloadContext"
     # LOGIN & SESSION: END
 
@@ -662,8 +663,10 @@ class AlarmController:
             headers=self._ajax_headers,
         ) as resp:
             text_rsp = await resp.text()
+            # print(resp)
 
-        if bool(text_rsp != self.KEEP_ALIVE_CHECK_RESPONSE):
+        if bool(text_rsp != self.KEEP_ALIVE_CHECK_RESPONSE and text_rsp != self.KEEP_ALIVE_CHECK_RESPONSE_1):
+            print("ERROR from keep_alive: '{}'".format(text_rsp))
             self.status = 'dead'
     # !IGH! MOD END }
 
